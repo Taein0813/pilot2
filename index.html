@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>음악 감정 평가 실험</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- jsPsych core -->
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
@@ -17,13 +19,18 @@
     body {
       max-width: 1100px;
       margin: 0 auto;
+      padding: 12px;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
     }
 
+    h2, h3 {
+      margin-top: 8px;
+    }
+
     fieldset {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       border: 1px dashed #a0a0a0;
-      padding: 12px 18px;
+      padding: 12px 16px;
       border-radius: 6px;
       background: #fafafa;
     }
@@ -35,18 +42,28 @@
 
     .trial-layout {
       display: flex;
-      gap: 24px;
-      align-items: flex-start;
+      flex-direction: column;
+      gap: 16px;
+      align-items: stretch;
       margin-top: 12px;
     }
 
-    .left-pane {
-      flex: 1.2;
-      text-align: left;
+    .left-pane, .right-pane {
+      width: 100%;
     }
 
-    .right-pane {
-      flex: 1;
+    /* 큰 화면에서는 좌우 배치 */
+    @media (min-width: 900px) {
+      .trial-layout {
+        flex-direction: row;
+        align-items: flex-start;
+      }
+      .left-pane {
+        flex: 1.4;
+      }
+      .right-pane {
+        flex: 1;
+      }
     }
 
     .top-instruction {
@@ -56,34 +73,45 @@
       padding: 10px;
       background: #fafafa;
       border-radius: 6px;
+      font-size: 14px;
     }
 
     .jspsych-btn {
       padding: 6px 16px;
+      font-size: 14px;
     }
 
     .slider-row {
-      margin: 6px 0 14px 0;
+      margin: 8px 0 12px 0;
       font-size: 13px;
     }
 
-    .slider-label-line {
+    .slider-title {
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .slider-line {
       display: flex;
-      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slider-line input[type="range"] {
+      flex: 1;
+      touch-action: pan-y;
+    }
+
+    .edge-label {
       font-size: 11px;
-      margin-top: 2px;
+      white-space: nowrap;
     }
 
-    .likert-row {
-      margin-top: 8px;
+    .progress-label {
       font-size: 13px;
-    }
-
-    .progress-indicator {
-      font-size: 13px;
-      margin-top: 6px;
-      text-align: center;
-      color: #444;
+      text-align: right;
+      margin-bottom: 4px;
+      color: #555;
     }
   </style>
 </head>
@@ -99,7 +127,7 @@
   // 1. jsPsych 초기화 (끝나면 시트로 전송)
   // -----------------------------
   const jsPsych = initJsPsych({
-    on_finish: function() {
+    on_finish: function () {
       const subject_id = jsPsych.randomization.randomID(10);
       jsPsych.data.addProperties({ subject_id: subject_id });
 
@@ -118,51 +146,48 @@
   });
 
   // -----------------------------
-  // 2. 베이스 감정 코드 (파일명용, 7개 × 10곡 = 70곡)
-  //    파일명 예: /stims/calm_C01.mp3, /stims/calm_S05.mp3
+  // 2. 자극용 감정(파일 이름용)
+  //    calm, cheerful, dreamy, energetic, love, sad, tense
+  //    각 감정당 C01~C05, S01~S05 (총 10개) → 총 70개
   // -----------------------------
   const baseEmotions = ["calm", "cheerful", "dreamy", "energetic", "love", "sad", "tense"];
 
+  let stimuli = [];
+  baseEmotions.forEach(em => {
+    for (let i = 1; i <= 5; i++) {
+      const idx = String(i).padStart(2, "0");
+      // C 버전
+      stimuli.push({
+        file: `stims/${em}_C${idx}.mp3`,
+        base_emotion: em,
+        item_code: `${em}_C${idx}`
+      });
+      // S 버전
+      stimuli.push({
+        file: `stims/${em}_S${idx}.mp3`,
+        base_emotion: em,
+        item_code: `${em}_S${idx}`
+      });
+    }
+  });
+
+  // 참가자마다 랜덤 순서
+  stimuli = jsPsych.randomization.shuffle(stimuli);
+  const TOTAL_TRIALS = stimuli.length; // 70
+
   // -----------------------------
-  // 2-1. 슬라이더 감정 정의 (라벨용)
+  // 3. 슬라이더용 7개 감정 정의
+  //    (설문에 보이는 라벨)
   // -----------------------------
   const sliderEmotions = [
     { code: "cheerful", label: "즐거운 (cheerful)" },
     { code: "energetic", label: "에너지가 넘치는 (energetic)" },
-    { code: "love", label: "사랑에 빠진 (in love)" },
+    { code: "in_love", label: "사랑에 빠진 (in love)" },
     { code: "dreamy", label: "꿈꾸는 듯한 (dreamy)" },
     { code: "calm", label: "평온한 (calm)" },
     { code: "sad", label: "슬픈 (sad)" },
     { code: "tense", label: "불안한 (tense)" }
   ];
-
-  // -----------------------------
-  // 3. 음악 자극 목록 생성
-  //    각 감정당 C01~C05, S01~S05 → 총 10곡
-  //    경로: /stims/{emotion}_{C|S}{01~05}.mp3
-  // -----------------------------
-  let stimuli = [];
-  baseEmotions.forEach(em => {
-    ["C", "S"].forEach(letter => {
-      for (let i = 1; i <= 5; i++) {
-        const num = String(i).padStart(2, '0');
-        stimuli.push({
-          file: `stims/${em}_${letter}${num}.mp3`,
-          base_emotion: em
-        });
-      }
-    });
-  });
-
-  // 무작위 순서로 섞기
-  stimuli = jsPsych.randomization.shuffle(stimuli);
-
-  // 진행상황 표시용 번호 부여
-  stimuli = stimuli.map((s, idx) => ({
-    ...s,
-    order: idx + 1,
-    total: stimuli.length
-  }));
 
   // -----------------------------
   // 4. 인트로 + 전공 여부
@@ -171,13 +196,13 @@
     type: jsPsychHtmlButtonResponse,
     stimulus: `
       <h2>음악 감정 평가 실험에 오신 것을 환영합니다</h2>
-      <p>이 실험에서는 총 <strong>70개의 짧은 음악</strong>을 듣고,</p>
+      <p>이 실험에서는 총 <strong>${TOTAL_TRIALS}개의 짧은 음악</strong>을 듣고,</p>
       <p>각 음악이 전달하는 <strong>7가지 감정의 강도(0~100 슬라이더)</strong>와</p>
       <p><strong>Valence, Arousal (0~100 슬라이더)</strong>를 평가하게 됩니다.</p>
       <p>모든 응답은 <strong>주관적인 판단</strong>에 따라 자유롭게 선택해 주세요.</p>
       <p>가능하면 조용한 환경에서 헤드폰 또는 이어폰을 사용해 주시기 바랍니다.</p>
     `,
-    choices: ['시작하기']
+    choices: ["시작하기"]
   };
 
   const major_question = {
@@ -196,45 +221,50 @@
 
   // -----------------------------
   // 5. 한 곡당 한 화면 trial
-  //    7개 감정 슬라이더(0~100, 기본 0) +
-  //    Valence/Arousal 슬라이더(0~100, 기본 50)
+  //    7개 감정 슬라이더(0~100, 기본값 0)
+  //    Valence & Arousal 슬라이더(0~100, 기본값 50)
+  //    상단에 '현재 n / 70' 표시
   // -----------------------------
   const song_trial = {
     type: jsPsychSurveyHtmlForm,
-    html: function() {
-      const file   = jsPsych.timelineVariable('file');
-      const order  = jsPsych.timelineVariable('order');
-      const total  = jsPsych.timelineVariable('total');
+    html: function () {
+      const file = jsPsych.timelineVariable("file");
+      const item_code = jsPsych.timelineVariable("item_code");
 
-      // 7개 감정 슬라이더
-      let sliderHTML = '';
+      // 지금까지 끝난 song trial 수를 기반으로 진행상황 계산
+      const finishedSongs = jsPsych.data.get().filter({ task: "song" }).count();
+      const currentIndex = finishedSongs + 1;
+
+      // 7개 감정 슬라이더 HTML
+      let sliderHTML = "";
       sliderEmotions.forEach(em => {
         sliderHTML += `
           <div class="slider-row">
-            <div><strong>${em.label}</strong></div>
-            <input type="range"
-                   name="${em.code}"
-                   min="0" max="100" step="1" value="0" />
-            <div class="slider-label-line">
-              <span>전혀 느껴지지 않음 (0)</span>
-              <span>매우 강하게 느껴짐 (100)</span>
+            <div class="slider-title"><strong>${em.label}</strong></div>
+            <div class="slider-line">
+              <span class="edge-label">전혀 느껴지지 않음 (0)</span>
+              <input type="range"
+                     name="${em.code}"
+                     min="0" max="100" step="1" value="0" />
+              <span class="edge-label">매우 강하게 느껴짐 (100)</span>
             </div>
           </div>
         `;
       });
 
       return `
+        <div class="progress-label">
+          곡 ${currentIndex} / ${TOTAL_TRIALS}
+        </div>
+
         <div class="top-instruction">
           <p>아래의 <strong>Play</strong> 버튼을 누르시면 음악이 재생됩니다. 필요하면 여러 번 들으실 수 있습니다.</p>
           <button type="button"
-                  onclick="document.getElementById('audio-${order}').play()"
+                  onclick="document.getElementById('audio-${item_code}').play()"
                   class="jspsych-btn">
             Play
           </button>
-          <audio id="audio-${order}" src="${file}"></audio>
-          <div class="progress-indicator">
-            현재 곡: <strong>${order} / ${total}</strong>
-          </div>
+          <audio id="audio-${item_code}" src="${file}"></audio>
         </div>
 
         <h3 style="text-align:center; margin-top:18px;">
@@ -253,37 +283,29 @@
             </fieldset>
           </div>
 
-          <!-- 오른쪽: Valence + Arousal (슬라이더) -->
+          <!-- 오른쪽: Valence + Arousal 슬라이더 -->
           <div class="right-pane">
             <fieldset>
               <legend>2. Valence (정서적 긍정성)</legend>
-              <p style="font-size:13px;">
-                이 음악이 표현하는 감정이 얼마나 부정적/긍정적으로 느껴지는지 슬라이더로 표시해 주세요.
-              </p>
-              <div class="slider-row">
+              <p>이 음악이 표현하는 감정이 얼마나 부정적/긍정적으로 느껴지는지 슬라이더로 표시해 주세요.</p>
+              <div class="slider-line" style="margin-top:8px;">
+                <span class="edge-label">매우 부정적인 (0)</span>
                 <input type="range"
                        name="valence"
                        min="0" max="100" step="1" value="50" />
-                <div class="slider-label-line">
-                  <span>매우 부정적인 (0)</span>
-                  <span>매우 긍정적인 (100)</span>
-                </div>
+                <span class="edge-label">매우 긍정적인 (100)</span>
               </div>
             </fieldset>
 
             <fieldset>
               <legend>3. Arousal (각성도 / 에너지)</legend>
-              <p style="font-size:13px;">
-                이 음악이 얼마나 차분한지 또는 에너지 넘치게 느껴지는지 슬라이더로 표시해 주세요.
-              </p>
-              <div class="slider-row">
+              <p>이 음악이 얼마나 차분한지 또는 에너지 넘치게 느껴지는지 슬라이더로 표시해 주세요.</p>
+              <div class="slider-line" style="margin-top:8px;">
+                <span class="edge-label">매우 차분한 (0)</span>
                 <input type="range"
                        name="arousal"
                        min="0" max="100" step="1" value="50" />
-                <div class="slider-label-line">
-                  <span>매우 차분한 (0)</span>
-                  <span>매우 에너지 넘치는 (100)</span>
-                </div>
+                <span class="edge-label">매우 에너지 넘치는 (100)</span>
               </div>
             </fieldset>
           </div>
@@ -292,15 +314,15 @@
     },
     button_label: "Next",
     data: {
-      file: jsPsych.timelineVariable('file'),
-      base_emotion: jsPsych.timelineVariable('base_emotion'),
-      order: jsPsych.timelineVariable('order'),
-      total: jsPsych.timelineVariable('total')
+      file: jsPsych.timelineVariable("file"),
+      base_emotion: jsPsych.timelineVariable("base_emotion"),
+      item_code: jsPsych.timelineVariable("item_code"),
+      task: "song"
     },
-    on_finish: function(data) {
+    on_finish: function (data) {
       const resp = data.response || {};
 
-      // 7개 감정 슬라이더 값 저장
+      // 7개 감정 슬라이더 값 저장 (숫자로 캐스팅)
       sliderEmotions.forEach(em => {
         const val = resp[em.code];
         data[em.code] = (val !== undefined && val !== null) ? Number(val) : null;
@@ -315,7 +337,7 @@
   const song_procedure = {
     timeline: [song_trial],
     timeline_variables: stimuli,
-    randomize_order: false   // 이미 위에서 셔플함
+    randomize_order: false // 이미 위에서 셔플함
   };
 
   // -----------------------------
@@ -326,9 +348,9 @@
     stimulus: `
       <h2>실험이 완료되었습니다.</h2>
       <p>참여해 주셔서 감사합니다.</p>
-      <p>종료 버튼을 누르시면 응답이 제출됩니다.</p>
+      <p>종료 버튼을 누르시면 응답이 저장됩니다.</p>
     `,
-    choices: ['종료']
+    choices: ["종료"]
   };
 
   // -----------------------------
