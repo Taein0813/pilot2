@@ -113,13 +113,11 @@
   const SUBMIT_URL = "https://script.google.com/macros/s/AKfycbzqpXa0rlWg5_USnJM9xPfCP23a7ljxRl5gOKrFRdyDItpuFE8DCcxC_1Rs9D2T7qSK-A/exec";
 
   // -----------------------------
-  // 1. jsPsych 초기화 (끝나면 CSV를 Apps Script로 전송)
+  // 1. jsPsych 초기화
+  //    (subject_id는 미리 만들어서 모든 trial에 붙이기)
   // -----------------------------
   const jsPsych = initJsPsych({
     on_finish: function() {
-      const subject_id = jsPsych.randomization.randomID(10);
-      jsPsych.data.addProperties({ subject_id: subject_id });
-
       const csv = jsPsych.data.get().csv();
 
       fetch(SUBMIT_URL, {
@@ -136,9 +134,14 @@
     }
   });
 
+  // 참가자 ID 생성 후 전체 데이터에 붙이기
+  const subject_id = jsPsych.randomization.randomID(10);
+  jsPsych.data.addProperties({ subject_id: subject_id });
+
   // -----------------------------
   // 2. 7개 감정(자극 그룹) 정의 + 파일 목록 생성
   //    파일 패턴: stims/{emotion}_C01~05.mp3, {emotion}_S01~05.mp3
+  //    예: stims/tense_S01.mp3
   // -----------------------------
   const emotionGroups = ['calm', 'cheerful', 'dreamy', 'energetic', 'love', 'sad', 'tense'];
 
@@ -150,10 +153,10 @@
       for (let i = 1; i <= 5; i++) {
         const num = String(i).padStart(2, '0');
         stimuli.push({
-          file: `stims/${em}_${tag}${num}.mp3`,
-          base_emotion: em,        // 자극이 속한 그룹
-          variant: `${tag}${num}`, // C01, S03 등
-          seq: seqCounter          // 일단 순서
+          file: `stims/${em}_${tag}${num}.mp3`,  // ← 앞에 / 없음
+          base_emotion: em,
+          variant: `${tag}${num}`,               // C01, S03 등
+          seq: seqCounter
         });
         seqCounter++;
       }
@@ -190,7 +193,7 @@
   const intro = {
     type: jsPsychHtmlButtonResponse,
     stimulus: `
-      <h1 class="main-title">음악을 들은 후, 아래의 감정 슬라이더와 Valence/Arousal 문항을 모두 평가해 주세요.</h1>
+      <h1 class="main-title">음악 감정 평가 실험</h1>
       <p style="text-align:center; margin-top:10px;">
         이 실험에서는 총 <strong>${TOTAL_TRIALS}개의 짧은 음악</strong>을 듣고,<br>
         각 음악이 전달하는 <strong>7가지 감정의 강도(0~100 슬라이더)</strong>와<br>
@@ -227,7 +230,6 @@
     html: function() {
       const file = jsPsych.timelineVariable('file');
       const idx  = jsPsych.timelineVariable('seq'); // 진행 순서
-      const base_emotion = jsPsych.timelineVariable('base_emotion');
 
       // 진행 상황 표시
       const progressHTML = `
@@ -236,7 +238,7 @@
         </div>
       `;
 
-      // 7개 감정 슬라이더
+      // 7개 감정 슬라이더 (기본값 0)
       let sliderHTML = '';
       sliderEmotions.forEach(em => {
         sliderHTML += `
@@ -316,7 +318,7 @@
               ${valenceSlider}
             </fieldset>
 
-            <fieldset>
+              <fieldset>
               <legend>3. Arousal (각성도 / 에너지)</legend>
               <p style="font-size:13px;">
                 이 음악이 얼마나 차분한지 또는 힘이 넘치게 느껴지는지 슬라이더로 표시해 주세요.
@@ -369,4 +371,13 @@
   };
 
   // -----------------------------
-  //
+  // 7. 전체 타임라인 실행
+  // -----------------------------
+  jsPsych.run([
+    intro,
+    major_question,
+    song_procedure,
+    outro
+  ]);
+</script>
+</html>
