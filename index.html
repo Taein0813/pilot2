@@ -86,11 +86,52 @@
       margin-top: 2px;
     }
 
+    .slider-label-line span {
+      flex: 1;
+      text-align: center;
+    }
+
+    .slider-label-line span:first-child {
+      text-align: left;
+    }
+
+    .slider-label-line span:last-child {
+      text-align: right;
+    }
+
     .progress-text {
       text-align: right;
       font-size: 13px;
       margin: 6px 4px 4px;
       color: #555;
+    }
+
+    /* IRB PDF 박스 */
+    .pdf-box {
+      width: 100%;
+      height: 400px; /* PDF 보이는 창 높이 */
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 12px 0 16px;
+    }
+
+    .pdf-box iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .consent-text {
+      font-size: 13px;
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+
+    .consent-section-title {
+      font-weight: 600;
+      margin: 10px 0 4px;
+      font-size: 14px;
     }
 
     /* 반응형: 화면이 좁아지면 위아래로 쌓이도록 */
@@ -114,7 +155,6 @@
 
   // -----------------------------
   // 1. jsPsych 초기화
-  //    (subject_id는 미리 만들어서 모든 trial에 붙이기)
   // -----------------------------
   const jsPsych = initJsPsych({
     on_finish: function() {
@@ -129,8 +169,6 @@
           csv: csv
         })
       });
-
-      // 참가자 브라우저로는 따로 다운로드 X
     }
   });
 
@@ -139,9 +177,179 @@
   jsPsych.data.addProperties({ subject_id: subject_id });
 
   // -----------------------------
+  // 1-0. 시작 안내 창
+  // -----------------------------
+  const start_screen = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+      <h1 class="main-title">음악 감정 평가 실험 안내</h1>
+      <p style="text-align:left; margin-top:16px; line-height:1.7;">
+        본 실험에 참여하시기 전에, 다음 두 가지 동의서에 대한 내용을 읽고 동의 여부를 선택해 주셔야 합니다.
+      </p>
+      <ul style="text-align:left; line-height:1.7;">
+        <li><strong>① 인간대상 연구피험자 동의서</strong></li>
+        <li><strong>② (사례비 지급 등)을 위한 개인정보 수집 및 활용 동의서</strong></li>
+      </ul>
+      <p style="text-align:left; line-height:1.7; margin-top:8px;">
+        두 동의서 모두에 <strong>동의</strong>하셔야만 본 행동실험에 참여하실 수 있으며,<br>
+        동의하지 않으시는 경우 실험이 즉시 종료됩니다.
+      </p>
+      <p style="text-align:left; line-height:1.7; margin-top:8px;">
+        다음 버튼을 누르시면, 먼저 ① 인간대상 연구피험자 동의서(PDF)를 확인하신 뒤<br>
+        동의 여부를 표시하는 화면으로 이동합니다.
+      </p>
+    `,
+    choices: ['다음으로 (동의서 확인 시작)']
+  };
+
+  // -----------------------------
+  // 1-1. 동의서 1: 인간대상 연구피험자 동의
+  // -----------------------------
+  const consent_human = {
+    type: jsPsychSurveyMultiChoice,
+    preamble: `
+      <h1 class="main-title">인간대상 연구피험자 동의서</h1>
+      <p class="consent-text">
+        먼저, 아래의 <strong>인간대상 연구피험자 동의서 전문(PDF 파일)</strong>을 스크롤하여 끝까지 읽어주세요.
+      </p>
+      <div class="pdf-box">
+        <!-- PDF 경로: 동일 폴더라면 consent_human.pdf 로 두면 됨 -->
+        <iframe src="consent_human.pdf"></iframe>
+      </div>
+      <p class="consent-text">
+        아래 문항들은 동의서 전문에서 <strong>피험자의 동의가 필요한 핵심 항목</strong>만 발췌한 것입니다.<br>
+        각 항목을 읽고 현재 본인의 의견에 해당하는 선택지를 골라 주세요.
+      </p>
+
+      <div class="consent-section-title">[개인정보 수집에 대한 동의]</div>
+      <p class="consent-text" style="margin-top:4px;">
+        본인은 개인정보 수집에 대한 내용을 확인하였으며, 본 연구에서 개인정보 수집에 대하여…
+      </p>
+    `,
+    questions: [
+      {
+        prompt: "1) 개인정보 수집에 대한 동의",
+        name: "human_main_collect",
+        options: [
+          "동의합니다",
+          "동의하지 않습니다 (미동의 시: 행동실험에 참여하실 수 없으며, 행동실험에 따른 금전적 보상을 받을 수 없습니다)"
+        ],
+        required: true
+      },
+      {
+        prompt: `
+          <span class="consent-section-title">[개인정보의 제공에 관한 사항]</span><br>
+          본 연구에서 수집되는 개인정보(나이, 성별, 인공와우 이식 방향, 인공와우 사용 기간, 음악 경험 종류 및 기간 등)가<br>
+          보존 기간 내 유사한 연구 범위에서 2차적으로 활용·제공될 수 있음에 대하여…
+        `,
+        name: "human_provide_scope",
+        options: [
+          "유사한 연구 범위 안에서만 제공하는 것에 동의합니다",
+          "포괄적 연구 목적으로 제공하는 것에 동의합니다",
+          "동의하지 않습니다"
+        ],
+        required: true
+      },
+      {
+        prompt: `
+          <span class="consent-section-title">[개인식별정보 포함 여부에 대한 동의]</span><br>
+          귀하가 개인정보 제공에 대해 동의하는 경우, 해당 정보는 원칙적으로 익명화되어 제공됩니다.<br>
+          단, 귀하가 개인식별정보를 포함하는 것에 별도로 동의하는 경우에는 예외가 될 수 있습니다.
+        `,
+        name: "human_identifiable",
+        options: [
+          "개인식별정보를 포함하는 것에 동의합니다",
+          "동의하지 않습니다"
+        ],
+        required: true
+      },
+      {
+        prompt: `
+          <span class="consent-section-title">[연구 관련 새로운 정보 통보 여부]</span><br>
+          본 연구 진행 중 귀하에게 영향을 줄 수 있는 새로운 정보를 연구자가 획득하는 경우,<br>
+          그 내용을 통보받기를 원하십니까?
+        `,
+        name: "human_notify",
+        options: [
+          "통보를 원합니다",
+          "통보를 원치 않습니다"
+        ],
+        required: true
+      }
+    ],
+    button_label: "다음 (사례비 동의서로 이동)",
+    on_finish: function(data) {
+      const resp = data.response || {};
+      const main = resp["human_main_collect"] || "";
+      // 개인정보 수집 '동의하지 않습니다' 선택 시 실험 종료
+      if (main.startsWith("동의하지")) {
+        jsPsych.endExperiment(
+          "개인정보 수집에 동의하지 않으셔서, 행동실험에 참여하실 수 없습니다.\n참여 의사를 검토해 주셔서 감사합니다."
+        );
+      }
+    }
+  };
+
+  // -----------------------------
+  // 1-2. 동의서 2: 사례비 지급용 개인정보 수집·활용 동의
+  // -----------------------------
+  const consent_payment = {
+    type: jsPsychSurveyMultiChoice,
+    preamble: `
+      <h1 class="main-title">(사례비 지급 등)을 위한 개인정보 수집 및 활용 동의서</h1>
+      <p class="consent-text">
+        다음은 행동실험 참여에 따른 사례비 지급을 위해 필요한 <strong>개인정보 수집 및 활용에 대한 동의서</strong>입니다.<br>
+        아래의 동의서 전문(PDF 파일)을 스크롤하여 끝까지 읽어주세요.
+      </p>
+      <div class="pdf-box">
+        <!-- 두 번째 PDF 경로 -->
+        <iframe src="consent_payment.pdf"></iframe>
+      </div>
+
+      <p class="consent-text">
+        아래는 동의서 중 <strong>핵심 정보</strong>를 요약한 것입니다.
+      </p>
+      <ul class="consent-text">
+        <li>실험 시간: <strong>30분</strong></li>
+        <li>사례비: <strong>10,000원</strong></li>
+      </ul>
+      <p class="consent-text">
+        사례비 지급을 위해 수집되는 개인정보 항목의 예시는 다음과 같습니다.<br>
+        성명, 주민등록번호(외부인의 경우 13자리), 연락처, 은행명 및 계좌번호, 주소(동까지) 등
+      </p>
+      <p class="consent-text">
+        <strong>미동의 시 불이익:</strong> 연구 참여에 따른 사례비 지급을 받을 수 없습니다.<br>
+        (이 실험에서는 두 동의서 모두에 동의하셔야 실험에 참여하실 수 있습니다.)
+      </p>
+    `,
+    questions: [
+      {
+        prompt: `
+          본인은 위와 같이 본인의 개인정보에 대한 수집 및 활용에 대한 내용을 확인하였으며,<br>
+          개인정보 수집 및 활용에 대하여…
+        `,
+        name: "payment_main_consent",
+        options: [
+          "동의합니다",
+          "동의하지 않습니다 (미동의 시: 연구 참여에 따른 사례비를 지급받을 수 없으며, 본 온라인 실험에 참여하실 수 없습니다)"
+        ],
+        required: true
+      }
+    ],
+    button_label: "다음 (음악 실험으로 진행)",
+    on_finish: function(data) {
+      const resp = data.response || {};
+      const main = resp["payment_main_consent"] || "";
+      if (main.startsWith("동의하지")) {
+        jsPsych.endExperiment(
+          "사례비 지급을 위한 개인정보 수집·활용에 동의하지 않으셔서, 본 온라인 실험에 참여하실 수 없습니다.\n참여 의사를 검토해 주셔서 감사합니다."
+        );
+      }
+    }
+  };
+
+  // -----------------------------
   // 2. 7개 감정(자극 그룹) 정의 + 파일 목록 생성
-  //    파일 패턴: stims/{emotion}_C01~05.mp3, {emotion}_S01~05.mp3
-  //    예: stims/tense_S01.mp3
   // -----------------------------
   const emotionGroups = ['calm', 'cheerful', 'dreamy', 'energetic', 'love', 'sad', 'tense'];
 
@@ -153,9 +361,9 @@
       for (let i = 1; i <= 5; i++) {
         const num = String(i).padStart(2, '0');
         stimuli.push({
-          file: `stims/${em}_${tag}${num}.mp3`,  // ← 앞에 / 없음
+          file: `stims/${em}_${tag}${num}.mp3`,
           base_emotion: em,
-          variant: `${tag}${num}`,               // C01, S03 등
+          variant: `${tag}${num}`,
           seq: seqCounter
         });
         seqCounter++;
@@ -175,7 +383,6 @@
 
   // -----------------------------
   // 3. 슬라이더용 감정 카테고리 (응답)
-  //    설문에 보이는 라벨: 한국어 + 영어
   // -----------------------------
   const sliderEmotions = [
     { code: "cheerful", label: "즐거운 (cheerful)" },
@@ -223,7 +430,6 @@
 
   // -----------------------------
   // 5. 한 곡당 한 화면 trial
-  //    7개 감정 슬라이더(0~100, 기본값 0) + V/A (0~100, 기본값 50)
   // -----------------------------
   const song_trial = {
     type: jsPsychSurveyHtmlForm,
@@ -231,14 +437,12 @@
       const file = jsPsych.timelineVariable('file');
       const idx  = jsPsych.timelineVariable('seq'); // 진행 순서
 
-      // 진행 상황 표시
       const progressHTML = `
         <div class="progress-text">
           곡 ${idx} / ${TOTAL_TRIALS}
         </div>
       `;
 
-      // 7개 감정 슬라이더 (기본값 0)
       let sliderHTML = '';
       sliderEmotions.forEach(em => {
         sliderHTML += `
@@ -249,19 +453,20 @@
                    min="0" max="100" step="1" value="0" />
             <div class="slider-label-line">
               <span>전혀 느껴지지 않음 (0)</span>
+              <span>중간 (50)</span>
               <span>매우 강하게 느껴짐 (100)</span>
             </div>
           </div>
         `;
       });
 
-      // Valence, Arousal 슬라이더 (기본값 50)
       const valenceSlider = `
         <div class="slider-row">
           <div><strong>Valence (정서가)</strong></div>
           <input type="range" name="valence" min="0" max="100" step="1" value="50" />
           <div class="slider-label-line">
             <span>매우 부정적인 (0)</span>
+            <span>중간 (50)</span>
             <span>매우 긍정적인 (100)</span>
           </div>
         </div>
@@ -273,6 +478,7 @@
           <input type="range" name="arousal" min="0" max="100" step="1" value="50" />
           <div class="slider-label-line">
             <span>매우 이완된, 차분한 (0)</span>
+            <span>중간 (50)</span>
             <span>매우 각성된, 강렬한 (100)</span>
           </div>
         </div>
@@ -288,7 +494,6 @@
                   class="jspsych-btn">
             Play
           </button>
-          <!-- 오디오 경로: stims/xxx.mp3 (앞에 / 붙이면 안 됨!) -->
           <audio id="audio-${idx}" src="${file}" preload="auto"></audio>
         </div>
 
@@ -297,7 +502,6 @@
         </h3>
 
         <div class="trial-layout">
-          <!-- 왼쪽: 7개 감정 슬라이더 -->
           <div class="left-pane">
             <fieldset>
               <legend>1. 이 음악에서 느껴지는 각 감정의 강도</legend>
@@ -308,7 +512,6 @@
             </fieldset>
           </div>
 
-          <!-- 오른쪽: Valence + Arousal -->
           <div class="right-pane">
             <fieldset>
               <legend>2. Valence (정서가)</legend>
@@ -318,7 +521,7 @@
               ${valenceSlider}
             </fieldset>
 
-              <fieldset>
+            <fieldset>
               <legend>3. Arousal (각성도)</legend>
               <p style="font-size:13px;">
                 이 음악이 표현하는 감정의 각성도를 슬라이더로 표시해 주세요.
@@ -339,13 +542,11 @@
     on_finish: function(data) {
       const resp = data.response || {};
 
-      // 7개 감정 슬라이더 값 저장 (숫자로 변환)
       sliderEmotions.forEach(em => {
         const val = resp[em.code];
         data[em.code] = (val !== undefined && val !== null) ? Number(val) : null;
       });
 
-      // Valence / Arousal (0~100)
       data.valence = resp.valence ? Number(resp.valence) : null;
       data.arousal = resp.arousal ? Number(resp.arousal) : null;
     }
@@ -354,7 +555,7 @@
   const song_procedure = {
     timeline: [song_trial],
     timeline_variables: stimuli,
-    randomize_order: false   // 이미 위에서 셔플함
+    randomize_order: false
   };
 
   // -----------------------------
@@ -374,6 +575,9 @@
   // 7. 전체 타임라인 실행
   // -----------------------------
   jsPsych.run([
+    start_screen,
+    consent_human,
+    consent_payment,
     intro,
     major_question,
     song_procedure,
